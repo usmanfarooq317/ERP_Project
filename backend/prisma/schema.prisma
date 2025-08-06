@@ -1,0 +1,340 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  FINANCE
+  SALES
+  MANAGER
+  EMPLOYEE
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      UserRole @default(EMPLOYEE)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders    Order[]
+  quotes    Quote[]
+  invoices  Invoice[]
+  sales     Sale[]
+
+  @@map("users")
+}
+
+model Company {
+  id          String  @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  country     String?
+  postalCode  String?
+  website     String?
+  taxId       String?
+  description String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  customers Customer[]
+  orders    Order[]
+  quotes    Quote[]
+  invoices  Invoice[]
+
+  @@map("companies")
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  firstName  String
+  lastName   String
+  email      String   @unique
+  phone      String?
+  address    String?
+  city       String?
+  state      String?
+  country    String?
+  postalCode String?
+  companyId  String?
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  company  Company? @relation(fields: [companyId], references: [id])
+  orders   Order[]
+  quotes   Quote[]
+  invoices Invoice[]
+  sales    Sale[]
+
+  @@map("customers")
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  sku         String  @unique
+  price       Decimal @db.Decimal(10, 2)
+  cost        Decimal @db.Decimal(10, 2)
+  quantity    Int     @default(0)
+  minStock    Int     @default(0)
+  category    String?
+  unit        String? // e.g., "piece", "kg", "liter"
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  orderItems   OrderItem[]
+  quoteItems   QuoteItem[]
+  invoiceItems InvoiceItem[]
+  saleItems    SaleItem[]
+
+  @@map("products")
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  orderNo    String      @unique
+  customerId String
+  companyId  String?
+  userId     String
+  status     OrderStatus @default(PENDING)
+  orderDate  DateTime    @default(now())
+  dueDate    DateTime?
+  subtotal   Decimal     @db.Decimal(10, 2)
+  taxAmount  Decimal     @db.Decimal(10, 2) @default(0)
+  discount   Decimal     @db.Decimal(10, 2) @default(0)
+  total      Decimal     @db.Decimal(10, 2)
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  // Relations
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  company    Company?    @relation(fields: [companyId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  orderItems OrderItem[]
+  invoices   Invoice[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model Quote {
+  id         String      @id @default(cuid())
+  quoteNo    String      @unique
+  customerId String
+  companyId  String?
+  userId     String
+  status     QuoteStatus @default(DRAFT)
+  quoteDate  DateTime    @default(now())
+  validUntil DateTime?
+  subtotal   Decimal     @db.Decimal(10, 2)
+  taxAmount  Decimal     @db.Decimal(10, 2) @default(0)
+  discount   Decimal     @db.Decimal(10, 2) @default(0)
+  total      Decimal     @db.Decimal(10, 2)
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  // Relations
+  customer   Customer    @relation(fields: [customerId], references: [id])
+  company    Company?    @relation(fields: [companyId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
+  quoteItems QuoteItem[]
+
+  @@map("quotes")
+}
+
+model QuoteItem {
+  id        String  @id @default(cuid())
+  quoteId   String
+  productId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  quote   Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("quote_items")
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNo     String        @unique
+  customerId    String
+  companyId     String?
+  userId        String
+  orderId       String?
+  status        InvoiceStatus @default(DRAFT)
+  invoiceDate   DateTime      @default(now())
+  dueDate       DateTime?
+  subtotal      Decimal       @db.Decimal(10, 2)
+  taxAmount     Decimal       @db.Decimal(10, 2) @default(0)
+  discount      Decimal       @db.Decimal(10, 2) @default(0)
+  total         Decimal       @db.Decimal(10, 2)
+  paidAmount    Decimal       @db.Decimal(10, 2) @default(0)
+  balanceAmount Decimal       @db.Decimal(10, 2)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  company      Company?      @relation(fields: [companyId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  order        Order?        @relation(fields: [orderId], references: [id])
+  invoiceItems InvoiceItem[]
+  payments     Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id        String  @id @default(cuid())
+  invoiceId String
+  productId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  invoiceId     String
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentDate   DateTime      @default(now())
+  paymentMethod String? // e.g., "cash", "credit_card", "bank_transfer"
+  reference     String? // payment reference number
+  status        PaymentStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("payments")
+}
+
+model Sale {
+  id         String   @id @default(cuid())
+  saleNo     String   @unique
+  customerId String
+  userId     String
+  saleDate   DateTime @default(now())
+  subtotal   Decimal  @db.Decimal(10, 2)
+  taxAmount  Decimal  @db.Decimal(10, 2) @default(0)
+  discount   Decimal  @db.Decimal(10, 2) @default(0)
+  total      Decimal  @db.Decimal(10, 2)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  customer  Customer   @relation(fields: [customerId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  saleItems SaleItem[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id        String  @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("sale_items")
+}
+
